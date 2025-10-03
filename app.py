@@ -1,12 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Line Sampler (Streamlit + Leaflet DualMap) — stable HTML rendering
-- Input two points (Lat/Lon or UTM)
-- EPSG selector only if UTM mode
-- Sample points every N meters
-- Two synchronized maps: left basemap (selectable), right blank
-- Red line + blue points on both
-- Exports: CSV (lat/lon+UTM), KML, Shapefile (ZIP)
+Defaults near Sommerland, Hamburg. UTM matches Lat/Lon (EPSG:32632).
 """
 
 import math
@@ -49,7 +44,6 @@ class UTM:
 # CRS / Projection helpers
 # =========================
 def utm_epsg_from_latlon(lat: float, lon: float) -> int:
-    """Infer UTM EPSG from a lat/lon (WGS84)."""
     zone = int(math.floor((lon + 180) / 6) + 1)
     is_northern = lat >= 0
     return (32600 if is_northern else 32700) + zone
@@ -72,7 +66,6 @@ def utm_to_wgs84(easting: float, northing: float, utm_epsg: int) -> Tuple[float,
 # Geometry helpers
 # =========================
 def interpolate_points_along_line(line: LineString, spacing_m: float) -> List[Point]:
-    """Return Points every `spacing_m` along LineString (meters CRS). Includes start & end."""
     length = max(0.0, float(line.length))
     if spacing_m <= 0 or length == 0.0:
         return [line.interpolate(0.0), line.interpolate(length)]
@@ -104,7 +97,6 @@ def export_csv_bytes(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False).encode("utf-8")
 
 def export_kml(points_ll: List[Tuple[float, float]], line_ll: List[Tuple[float, float]]) -> bytes:
-    """Plain KML."""
     kml = simplekml.Kml()
     ls = kml.newlinestring(name="Line")
     ls.coords = [(lon, lat) for lat, lon in line_ll]
@@ -118,7 +110,6 @@ def export_kml(points_ll: List[Tuple[float, float]], line_ll: List[Tuple[float, 
 def export_shapefile_zip(points_utm: List[Tuple[float, float]],
                          line_utm: List[Tuple[float, float]],
                          utm_epsg: int) -> bytes:
-    """ZIP with points and line Shapefiles in given UTM CRS."""
     tmpdir = tempfile.mkdtemp()
     try:
         gdf_points = gpd.GeoDataFrame(
@@ -157,9 +148,8 @@ def export_shapefile_zip(points_utm: List[Tuple[float, float]],
 # =========================
 st.set_page_config(page_title="Line Sampler (DualMap)", layout="wide")
 st.title("Line Sampler")
-st.caption("Enter two points, sample every N meters, view two synchronized maps (left basemap, right blank), export CSV/KML/Shapefile.")
+st.caption("Defaults near Sommerland, Hamburg. UTM defaults match Lat/Lon (EPSG:32632).")
 
-# Keep generated output visible across reruns
 if "generated" not in st.session_state:
     st.session_state.generated = False
 
@@ -183,47 +173,55 @@ with st.sidebar:
         index=0,
     )
 
+# --- Defaults near Sommerland, Hamburg ---
+# LAT/LON defaults (A exact, B slightly farther away for a longer line)
+DEFAULT_A_LL = (53.793776, 9.548624)
+DEFAULT_B_LL = (53.796500, 9.555800)
+
+# Matching UTM defaults in EPSG:32632 (computed from the above)
+DEFAULT_A_UTM = (536139.392, 5960717.090, 32632)   # (E, N, EPSG)
+DEFAULT_B_UTM = (536609.719, 5961023.825, 32632)
+
 # Point inputs
 st.subheader("Point A")
 colA1, colA2, colA3 = st.columns(3)
 if mode == "Lat/Lon (WGS84)":
     with colA1:
-        A_lat = st.number_input("A Latitude", value=55.6761, format="%.8f")
+        A_lat = st.number_input("A Latitude", value=float(DEFAULT_A_LL[0]), format="%.8f")
     with colA2:
-        A_lon = st.number_input("A Longitude", value=12.5683, format="%.8f")
+        A_lon = st.number_input("A Longitude", value=float(DEFAULT_A_LL[1]), format="%.8f")
     with colA3:
         st.write("")
     A_ll = LatLon(A_lat, A_lon)
 else:
     with colA1:
-        A_e = st.number_input("A Easting", value=720000.0, format="%.3f")
+        A_e = st.number_input("A Easting", value=float(DEFAULT_A_UTM[0]), format="%.3f")
     with colA2:
-        A_n = st.number_input("A Northing", value=6170000.0, format="%.3f")
+        A_n = st.number_input("A Northing", value=float(DEFAULT_A_UTM[1]), format="%.3f")
     with colA3:
-        A_epsg = st.number_input("UTM EPSG (for A & B)", value=32632, step=1)
+        A_epsg = st.number_input("UTM EPSG (for A & B)", value=int(DEFAULT_A_UTM[2]), step=1)
     A_utm = UTM(A_e, A_n, A_epsg)
 
 st.subheader("Point B")
 colB1, colB2, colB3 = st.columns(3)
 if mode == "Lat/Lon (WGS84)":
     with colB1:
-        B_lat = st.number_input("B Latitude", value=55.60, format="%.8f")
+        B_lat = st.number_input("B Latitude", value=float(DEFAULT_B_LL[0]), format="%.8f")
     with colB2:
-        B_lon = st.number_input("B Longitude", value=12.50, format="%.8f")
+        B_lon = st.number_input("B Longitude", value=float(DEFAULT_B_LL[1]), format="%.8f")
     with colB3:
         st.write("")
     B_ll = LatLon(B_lat, B_lon)
 else:
     with colB1:
-        B_e = st.number_input("B Easting", value=725000.0, format="%.3f")
+        B_e = st.number_input("B Easting", value=float(DEFAULT_B_UTM[0]), format="%.3f")
     with colB2:
-        B_n = st.number_input("B Northing", value=6175000.0, format="%.3f")
+        B_n = st.number_input("B Northing", value=float(DEFAULT_B_UTM[1]), format="%.3f")
     with colB3:
         st.write("")
-    B_utm = UTM(B_e, B_n, A_epsg)
+    B_utm = UTM(B_e, B_n, A_epsg)  # share EPSG with A
 
 st.markdown("---")
-# Buttons: Generate / Reset
 c_gen, c_reset = st.columns([1, 1])
 with c_gen:
     if st.button("Generate", type="primary"):
@@ -277,7 +275,6 @@ if st.session_state.generated:
             lat_min, lat_max = min(all_lats), max(all_lats)
             lon_min, lon_max = min(all_lons), max(all_lons)
             center = [(lat_min + lat_max) / 2.0, (lon_min + lon_max) / 2.0]
-            # crude zoom from span
             span_deg = max(1e-9, max(abs(lat_max - lat_min), abs(lon_max - lon_min)))
             zoom = int(max(2, min(18, math.log2(360.0 / span_deg))))
         else:
@@ -308,17 +305,17 @@ if st.session_state.generated:
                 name="ESRI Street", control=False
             ).add_to(dual.m1)
 
-        # Right: blank (keep tiles=None on dual.m2)
+        # Right: blank (dual.m2 stays tiles=None)
 
         # Add red line + blue points to BOTH maps
         folium.PolyLine([(lat, lon) for (lat, lon) in line_ll], color="#ff0000", weight=4).add_to(dual.m1)
         folium.PolyLine([(lat, lon) for (lat, lon) in line_ll], color="#ff0000", weight=4).add_to(dual.m2)
 
         for i, (lat, lon) in enumerate(pts_ll):
-            folium.CircleMarker(location=[lat, lon], radius=4, color="#0000ff",
+            folium.CircleMarker([lat, lon], radius=4, color="#0000ff",
                                 fill=True, fillOpacity=1.0,
                                 tooltip=f"P{i}: {lat:.6f}, {lon:.6f}").add_to(dual.m1)
-            folium.CircleMarker(location=[lat, lon], radius=4, color="#0000ff",
+            folium.CircleMarker([lat, lon], radius=4, color="#0000ff",
                                 fill=True, fillOpacity=1.0,
                                 tooltip=f"P{i}: {lat:.6f}, {lon:.6f}").add_to(dual.m2)
 
@@ -329,23 +326,16 @@ if st.session_state.generated:
         # Downloads + summary
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.download_button("⬇️ CSV (lat/lon + UTM)", data=csv_bytes,
-                               file_name="points_along_line.csv", mime="text/csv")
+            st.download_button("⬇️ CSV", data=csv_bytes, file_name="points_along_line.csv", mime="text/csv")
         with c2:
-            st.download_button("⬇️ KML", data=kml_bytes,
-                               file_name="line_and_points.kml", mime="application/vnd.google-earth.kml+xml")
+            st.download_button("⬇️ KML", data=kml_bytes, file_name="line_and_points.kml", mime="application/vnd.google-earth.kml+xml")
         with c3:
-            st.download_button("⬇️ Shapefile (ZIP)", data=shp_zip_bytes,
-                               file_name="shapefiles.zip", mime="application/zip")
+            st.download_button("⬇️ Shapefile (ZIP)", data=shp_zip_bytes, file_name="shapefiles.zip", mime="application/zip")
 
-        st.success(
-            f"Generated {len(pts_utm)} points — Working CRS: EPSG:{working_epsg} — "
-            f"Line length ≈ {line_geom_utm.length:.2f} m"
-        )
-        st.dataframe(df_export.head(20), use_container_width=True)
+        st.success(f"Generated {len(pts_utm)} points — EPSG:{working_epsg} — Line length ≈ {line_geom_utm.length:.2f} m")
+        st.dataframe(df_export.head(20), width="stretch")
 
     except Exception as e:
         st.error(f"Something went wrong: {e}")
-
 else:
     st.info("Set inputs and click **Generate** to show the synchronized maps and downloads.")
