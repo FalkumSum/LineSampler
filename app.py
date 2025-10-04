@@ -146,9 +146,9 @@ def export_shapefile_zip(points_utm: List[Tuple[float, float]],
 # =========================
 # Streamlit UI (with persistence)
 # =========================
-st.set_page_config(page_title="Line Sampler (DualMap)", layout="wide")
+st.set_page_config(page_title="Line Sampler", layout="wide")
 st.title("Line Sampler")
-st.caption("Defaults near Sommerland, Hamburg. UTM defaults match Lat/Lon (EPSG:32632).")
+st.caption("Define points A and B in either UTM (default EPSG:32632) or Lat/Lon.")
 
 if "generated" not in st.session_state:
     st.session_state.generated = False
