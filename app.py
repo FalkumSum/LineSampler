@@ -179,7 +179,7 @@ DEFAULT_A_LL = (53.79378, 9.54862)
 DEFAULT_B_LL = (53.79650, 9.55580)
 
 # Matching UTM defaults in EPSG:32632 (computed from the above)
-DEFAULT_A_UTM = (5361000, 5960700, 32632)   # (E, N, EPSG)
+DEFAULT_A_UTM = (536100, 5960700, 32632)   # (E, N, EPSG)
 DEFAULT_B_UTM = (536600, 5961000, 32632)
 
 # Point inputs
@@ -338,4 +338,4 @@ if st.session_state.generated:
     except Exception as e:
         st.error(f"Something went wrong: {e}")
 else:
-    st.info("Set inputs and click **Generate** to show the synchronized maps and downloads.")
+    st.info("Set inputs and click **Generate** to show the points maps and download options.")
